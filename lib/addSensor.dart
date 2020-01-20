@@ -9,6 +9,7 @@ class addSensor extends StatefulWidget {
   String maxTemp;
   String name;
   String mqtt;
+  double temp = 0.0;
   @override
   _addSensorState createState() => _addSensorState();
 }
@@ -16,6 +17,8 @@ class addSensor extends StatefulWidget {
 
 // ignore: camel_case_types
 class _addSensorState extends State<addSensor> {
+
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -32,9 +35,9 @@ class _addSensorState extends State<addSensor> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(15.0, 0.0, 15.0, 20.0),
                 child: new LinearPercentIndicator(
-                  center: new Text("10 °C"),
+                  center: new Text(widget.temp.toString() + " °C"),
                   leading: new Text( widget.minTemp + " °C"),
-                  trailing: new Text(widget.maxTemp + "°C"),
+                  trailing: new Text(widget.maxTemp + " °C"),
                   percent: 0.1,
                   lineHeight: 20.0,
                   progressColor: Colors.blue,
