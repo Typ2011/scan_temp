@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:scan_temp/addSensor.dart';
 
@@ -14,6 +16,8 @@ class _addSensorScreenState extends State<addSensorScreen> {
   TextEditingController _controllerMin = TextEditingController();
   TextEditingController _controllerMax = TextEditingController();
 
+
+
   @override
   void dispose() {
     // Clean up the controller when the widget is disposed.
@@ -26,6 +30,7 @@ class _addSensorScreenState extends State<addSensorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final StreamController<String> stream = ModalRoute.of(context).settings.arguments;
     return Scaffold(
       appBar: AppBar(
         title: Text("ScanTemp",
@@ -84,7 +89,7 @@ class _addSensorScreenState extends State<addSensorScreen> {
             child: Center(
               child: RaisedButton(
                 onPressed: () {
-                  var temp = new addSensor(_controllerMax.text, _controllerMin.text, _controllerMqttTopic.text, _controllerName.text);
+                  var temp = new addSensor(_controllerMax.text, _controllerMin.text, _controllerMqttTopic.text, _controllerName.text, stream.stream);
                   Navigator.pop(context, temp);
                   },
                 child: Text("Add Sensor", style: TextStyle(color: Colors.white),),
