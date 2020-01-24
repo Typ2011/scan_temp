@@ -84,6 +84,36 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  void _showDialog() {
+    // flutter defined function
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        // return object of type Dialog
+        return AlertDialog(
+          title: new Text("ERROR"),
+          content: new Text("Verbindung zum MQTT Server abgebrochen! Verbing erneut herstellen?"),
+          actions: <Widget>[
+            // usually buttons at the bottom of the dialog
+            new FlatButton(
+              child: new Text("Close"),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            new FlatButton(
+                onPressed: () {
+                  connect();
+                  Navigator.of(context).pop();
+                },
+                child: new Text("Reconnect")
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   _navigateAndDisplayAdd(BuildContext context) async {
     final result = await Navigator.pushNamed(context, "/addSensor", arguments: _controller);
     if(result != null) {
@@ -111,7 +141,7 @@ class _MyHomePageState extends State<MyHomePage> {
   int port                = 18806;
   String username         = 'gpldchfk';
   String passwd           = '0orDOEQ7IvWW';
-  String clientIdentifier = 'MQTTClient';
+  String clientIdentifier = UniqueKey().toString();
 
   mqtt.MqttClient client;
   mqtt.MqttConnectionState connectionState;
@@ -139,14 +169,14 @@ class _MyHomePageState extends State<MyHomePage> {
 
 //    client.logging(on: true);
 
-    client.keepAlivePeriod = 30;
+    client.keepAlivePeriod = 180;
 
     client.onDisconnected = _onDisconnected;
 
     final mqtt.MqttConnectMessage connMess = mqtt.MqttConnectMessage()
         .withClientIdentifier(clientIdentifier)
 //        .startClean() // Non persistent session for testing
-        .keepAliveFor(30)
+        .keepAliveFor(120)
         .withWillQos(mqtt.MqttQos.atMostOnce);
     print('[MQTT client] MQTT client connecting....');
     client.connectionMessage = connMess;
@@ -179,23 +209,25 @@ class _MyHomePageState extends State<MyHomePage> {
     print('[MQTT client] _disconnect()');
     client.disconnect();
     _onDisconnected();
-//    sleep5();
 //    print('[MQTT client] MQTT client reconnecting...');
-//    await client.connect(username, passwd);
+//    connect();
 //    await loadSharedPrefs();
 //    print('[MQTT client] connected');
   }
 
   Future<void> _onDisconnected() async {
     print('[MQTT client] _onDisconnected');
-    //topics.clear();
+//    topics.clear();
     connectionState = client.connectionState;
     client = null;
     subscription.cancel();
     subscription = null;
-    print('[MQTT client] MQTT client disconnected');
+    await sleep5();
+    _showDialog();
+//    print('[MQTT client] MQTT client disconnected');
+//    await sleep5();
 //    print('[MQTT client] MQTT client reconnecting...');
-//    connect();
+//    await connect();
 //    await loadSharedPrefs();
 //    print('[MQTT client] connected');
   }
