@@ -12,6 +12,7 @@ class addSensor extends StatefulWidget {
   double temp = 0.0;
   double tempTemp = 0.0;
   double percent = 0.0;
+  Color percentColor = Colors.blue;
   Stream<String> stream;
 
   void setStream(Stream<String> pStream) => stream = pStream;
@@ -44,26 +45,34 @@ class _addSensorState extends State<addSensor> {
 @override
   void initState() {
     widget.stream.listen((mqtt) {
-      if(mqtt == widget.mqtt) {
-        setState(() {
-          widget.temp = widget.tempTemp;
-          updatePercent();
-        });
+      if (mqtt == widget.mqtt) {
+        if (this.mounted) {
+          setState(() {
+            widget.temp = widget.tempTemp;
+            if(updatePercent() >= 0.0 && updatePercent() <= 1.0) {
+              widget.percent = updatePercent();
+              if(widget.percentColor != Colors.blue) {
+                widget.percentColor = Colors.blue;
+              }
+            } else {
+              widget.percent = 1.0;
+              widget.percentColor = Colors.red;
+            }
+          });
+        }
       }
     });
     super.initState();
   }
 
-  void updatePercent() {
-    setState(() {
-      widget.percent = (widget.temp - double.parse(widget.minTemp)) / (double.parse(widget.maxTemp) - double.parse(widget.minTemp));
-    });
+  double updatePercent() {
+        return (widget.temp - double.parse(widget.minTemp)) / (double.parse(widget.maxTemp) - double.parse(widget.minTemp));
   }
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8.0, 20.0, 8.0, 10.0),
+      padding: const EdgeInsets.fromLTRB(8.0, 20.0, 8.0, 20.0),
       child: Card(
         elevation: 5.0,
         child: Center(
@@ -76,12 +85,18 @@ class _addSensorState extends State<addSensor> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(15.0, 0.0, 15.0, 20.0),
                 child: new LinearPercentIndicator(
-                  center: new Text(widget.temp.toString() + " °C"),
-                  leading: new Text(widget.minTemp + " °C"),
-                  trailing: new Text(widget.maxTemp + " °C"),
+                  center: new Text(widget.temp.toString() + " °C", style: TextStyle(color: Colors.white),),
+                  leading: Padding(
+                    padding: const EdgeInsets.only(right: 5.0),
+                    child: new Text(widget.minTemp + " °C"),
+                  ),
+                  trailing: Padding(
+                    padding: const EdgeInsets.only(left: 5.0),
+                    child: new Text(widget.maxTemp + " °C"),
+                  ),
                   percent: widget.percent,
                   lineHeight: 20.0,
-                  progressColor: Colors.blue,
+                  progressColor: widget.percentColor,
                 ),
               )
             ],

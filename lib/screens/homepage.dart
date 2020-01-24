@@ -27,6 +27,7 @@ class _MyHomePageState extends State<MyHomePage> {
     try {
       await connect();
       List<String> sensorList = await sharedPref.readStringList("sensors");
+      print("[SharedPref] Loaded SensorName List: " + sensorList.toString());
       sensorList.forEach((sensorName) async {
         addSensor tempSensor = addSensor.fromJson(await sharedPref.read(sensorName));
         tempSensor.setStream(_controller.stream);
@@ -40,19 +41,7 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  findAndRemoveStringList(String key, String listKey) async {
-    List<String> list = await sharedPref.readStringList(key);
-    await sharedPref.remove(key);
-    var counter = 0;
-    list.forEach((data) {
-      print(counter.toString() + " : " + data + " : " + listKey);
-      if(data == listKey) {
-        list.removeAt(counter);
-      }
-      counter++;
-    });
-    await sharedPref.saveStringList(key, list);
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -82,7 +71,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   });
                   unsubscribeToTopic(tempSensor.mqtt);
                   sharedPref.remove(tempSensor.name);
-                  findAndRemoveStringList("sensors", tempSensor.name);
+                  sharedPref.findAndRemoveStringList("sensors", tempSensor.name);
                 },
             );
           },
@@ -90,27 +79,29 @@ class _MyHomePageState extends State<MyHomePage> {
       floatingActionButton: FloatingActionButton(
         onPressed: () =>_navigateAndDisplayAdd(context),
         tooltip: 'Add Sensor',
-        child: Icon(Icons.add),
+        child: Icon(Icons.add, color: Colors.white,),
       ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 
   _navigateAndDisplayAdd(BuildContext context) async {
     final result = await Navigator.pushNamed(context, "/addSensor", arguments: _controller);
-    setState(() {
-      sensors.add(result);
-    });
-    addSensor resultSensor = result;
-    sharedPref.save(resultSensor.name, resultSensor);
+    if(result != null) {
+      setState(() {
+        sensors.add(result);
+      });
+      addSensor resultSensor = result;
+      sharedPref.save(resultSensor.name, resultSensor);
 
-    List<String> sensorList = [];
-    if(await sharedPref.readStringList("sensors") != null) {
-      sensorList = await sharedPref.readStringList("sensors");
+      List<String> sensorList = [];
+      if(await sharedPref.readStringList("sensors") != null) {
+        sensorList = await sharedPref.readStringList("sensors");
+      }
+      sensorList.add(resultSensor.name);
+      sharedPref.saveStringList("sensors", sensorList);
+
+      subscribeToTopic(resultSensor.mqtt);
     }
-    sensorList.add(resultSensor.name);
-    sharedPref.saveStringList("sensors", sensorList);
-
-    subscribeToTopic(resultSensor.mqtt);
   }
 
   //MQTT Client, da immoment nichts anderes funktioniert
@@ -120,7 +111,7 @@ class _MyHomePageState extends State<MyHomePage> {
   int port                = 18806;
   String username         = 'gpldchfk';
   String passwd           = '0orDOEQ7IvWW';
-  String clientIdentifier = 'android';
+  String clientIdentifier = 'MQTTClient';
 
   mqtt.MqttClient client;
   mqtt.MqttConnectionState connectionState;
@@ -154,7 +145,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
     final mqtt.MqttConnectMessage connMess = mqtt.MqttConnectMessage()
         .withClientIdentifier(clientIdentifier)
-        .startClean() // Non persistent session for testing
+//        .startClean() // Non persistent session for testing
         .keepAliveFor(30)
         .withWillQos(mqtt.MqttQos.atMostOnce);
     print('[MQTT client] MQTT client connecting....');
@@ -180,16 +171,22 @@ class _MyHomePageState extends State<MyHomePage> {
 
   }
 
-  void _disconnect() {
+  Future sleep5() {
+    return new Future.delayed(const Duration(seconds: 5), () => "5");
+  }
+
+  Future<void> _disconnect() async {
     print('[MQTT client] _disconnect()');
     client.disconnect();
     _onDisconnected();
-    print('[MQTT client] MQTT client reconnecting...');
-    connect();
-    print('[MQTT client] connected');
+//    sleep5();
+//    print('[MQTT client] MQTT client reconnecting...');
+//    await client.connect(username, passwd);
+//    await loadSharedPrefs();
+//    print('[MQTT client] connected');
   }
 
-  void _onDisconnected() {
+  Future<void> _onDisconnected() async {
     print('[MQTT client] _onDisconnected');
     //topics.clear();
     connectionState = client.connectionState;
@@ -197,9 +194,10 @@ class _MyHomePageState extends State<MyHomePage> {
     subscription.cancel();
     subscription = null;
     print('[MQTT client] MQTT client disconnected');
-    print('[MQTT client] MQTT client reconnecting...');
-    connect();
-    print('[MQTT client] connected');
+//    print('[MQTT client] MQTT client reconnecting...');
+//    connect();
+//    await loadSharedPrefs();
+//    print('[MQTT client] connected');
   }
 
   void onMessage(List<mqtt.MqttReceivedMessage> event) {
@@ -211,7 +209,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
     print('[MQTT client] MQTT message: topic is <${event[0].topic}>, '
         'payload is <-- ${message} -->');
-    print(client.connectionStatus);
+    print("[MQTT client] " + client.connectionStatus.toString());
     print("[MQTT client] message with topic: ${event[0].topic}");
     print("[MQTT client] message with message: ${message}");
     setState(() {
