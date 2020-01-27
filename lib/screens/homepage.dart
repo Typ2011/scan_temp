@@ -1,8 +1,9 @@
 import 'dart:async';
-import 'package:mqtt_client/mqtt_client.dart' as mqtt;
 import 'package:flutter/material.dart';
 import 'package:scan_temp/addSensor.dart';
 import 'package:scan_temp/LocalKeyValuePersistence.dart';
+import 'package:scan_temp/api/mqtt.dart';
+
 class MyHomePage extends StatefulWidget {
   MyHomePage({Key key, this.title}) : super(key: key);
 
@@ -16,16 +17,19 @@ class _MyHomePageState extends State<MyHomePage> {
   List<addSensor> sensors = [];
   StreamController<String> _controller = StreamController<String>.broadcast();
   SharedPref sharedPref = SharedPref();
+  MQTTClient mqttClient = new MQTTClient();
+
 
   @override
   void initState() {
+    mqttClient.setFunctions(updateList, _showDialog);
     loadSharedPrefs();
     super.initState();
   }
 
-  loadSharedPrefs() async {
+  void loadSharedPrefs() async {
     try {
-      await connect();
+      await mqttClient.connect();
       List<String> sensorList = await sharedPref.readStringList("sensors");
       print("[SharedPref] Loaded SensorName List: " + sensorList.toString());
       sensorList.forEach((sensorName) async {
@@ -34,67 +38,21 @@ class _MyHomePageState extends State<MyHomePage> {
         setState(() {
           sensors.add(tempSensor);
         });
-        subscribeToTopic(tempSensor.mqtt);
+        mqttClient.subscribeToTopic(tempSensor.mqtt);
       });
     } catch (Excepetion) {
-
+      print(Excepetion);
     }
   }
 
-
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("ScanTemp",
-          style: TextStyle(
-            color: Colors.white,
-          ),
-        ),
-        centerTitle: true,
-//        actions: <Widget>[
-//          IconButton(icon: Icon(Icons.cast_connected, color: Colors.white,), onPressed: () => connect()),
-//        ],
-      ),
-      body: ListView.builder(
-        itemCount: sensors.length,
-        itemBuilder: (context, index) {
-            return Dismissible(
-                key: UniqueKey(),
-                child: sensors[index],
-                background: Container(color: Colors.red),
-                onDismissed: (direction) {
-                  addSensor tempSensor = sensors[index];
-                  setState(() {
-                    sensors.removeAt(index);
-                  });
-                  unsubscribeToTopic(tempSensor.mqtt);
-                  sharedPref.remove(tempSensor.name);
-                  sharedPref.findAndRemoveStringList("sensors", tempSensor.name);
-                },
-            );
-          },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () =>_navigateAndDisplayAdd(context),
-        tooltip: 'Add Sensor',
-        child: Icon(Icons.add, color: Colors.white,),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
-    );
-  }
-
   void _showDialog() {
-    // flutter defined function
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        // return object of type Dialog
         return AlertDialog(
           title: new Text("ERROR"),
           content: new Text("Verbindung zum MQTT Server abgebrochen! Verbing erneut herstellen?"),
           actions: <Widget>[
-            // usually buttons at the bottom of the dialog
             new FlatButton(
               child: new Text("Close"),
               onPressed: () {
@@ -103,7 +61,7 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
             new FlatButton(
                 onPressed: () {
-                  connect();
+                  mqttClient.connect();
                   Navigator.of(context).pop();
                 },
                 child: new Text("Reconnect")
@@ -130,128 +88,57 @@ class _MyHomePageState extends State<MyHomePage> {
       sensorList.add(resultSensor.name);
       sharedPref.saveStringList("sensors", sensorList);
 
-      subscribeToTopic(resultSensor.mqtt);
+      mqttClient.subscribeToTopic(resultSensor.mqtt);
     }
   }
 
-  //MQTT Client, da immoment nichts anderes funktioniert
-  //TODO: MQTT in seperater Klasse
-
-  String broker           = 'hairdresser.cloudmqtt.com';
-  int port                = 18806;
-  String username         = 'gpldchfk';
-  String passwd           = '0orDOEQ7IvWW';
-  String clientIdentifier = UniqueKey().toString();
-
-  mqtt.MqttClient client;
-  mqtt.MqttConnectionState connectionState;
-  StreamSubscription subscription;
-
-  void unsubscribeToTopic(String topic) {
-    if (connectionState == mqtt.MqttConnectionState.connected) {
-      print('[MQTT client] Unsubscribing from ${topic.trim()}');
-      client.unsubscribe(topic);
-    }
-  }
-
-  void subscribeToTopic(String topic) {
-    if (connectionState == mqtt.MqttConnectionState.connected) {
-      print('[MQTT client] Subscribing to ${topic.trim()}');
-      client.subscribe(topic, mqtt.MqttQos.exactlyOnce);
-    }
-  }
-
-  void connect() async {
-
-    client = mqtt.MqttClient(broker, '');
-
-    client.port = port;
-
-//    client.logging(on: true);
-
-    client.keepAlivePeriod = 180;
-
-    client.onDisconnected = _onDisconnected;
-
-    final mqtt.MqttConnectMessage connMess = mqtt.MqttConnectMessage()
-        .withClientIdentifier(clientIdentifier)
-//        .startClean() // Non persistent session for testing
-        .keepAliveFor(120)
-        .withWillQos(mqtt.MqttQos.atMostOnce);
-    print('[MQTT client] MQTT client connecting....');
-    client.connectionMessage = connMess;
-
-    try {
-      await client.connect(username, passwd);
-    } catch (e) {
-      print(e);
-      _disconnect();
-    }
-
-    if (client.connectionState == mqtt.MqttConnectionState.connected) {
-      print('[MQTT client] connected');
-      connectionState = client.connectionState;
-    } else {
-      print('[MQTT client] ERROR: MQTT client connection failed - '
-          'disconnecting, state is ${client.connectionStatus}');
-      _disconnect();
-    }
-
-    subscription = client.updates.listen(onMessage);
-
-  }
-
-  Future sleep5() {
-    return new Future.delayed(const Duration(seconds: 5), () => "5");
-  }
-
-  Future<void> _disconnect() async {
-    print('[MQTT client] _disconnect()');
-    client.disconnect();
-    _onDisconnected();
-//    print('[MQTT client] MQTT client reconnecting...');
-//    connect();
-//    await loadSharedPrefs();
-//    print('[MQTT client] connected');
-  }
-
-  Future<void> _onDisconnected() async {
-    print('[MQTT client] _onDisconnected');
-//    topics.clear();
-    connectionState = client.connectionState;
-    client = null;
-    subscription.cancel();
-    subscription = null;
-    await sleep5();
-    _showDialog();
-//    print('[MQTT client] MQTT client disconnected');
-//    await sleep5();
-//    print('[MQTT client] MQTT client reconnecting...');
-//    await connect();
-//    await loadSharedPrefs();
-//    print('[MQTT client] connected');
-  }
-
-  void onMessage(List<mqtt.MqttReceivedMessage> event) {
-    print(event.length);
-    final mqtt.MqttPublishMessage recMess =
-    event[0].payload as mqtt.MqttPublishMessage;
-    final String message =
-    mqtt.MqttPublishPayload.bytesToStringAsString(recMess.payload.message);
-
-    print('[MQTT client] MQTT message: topic is <${event[0].topic}>, '
-        'payload is <-- ${message} -->');
-    print("[MQTT client] " + client.connectionStatus.toString());
-    print("[MQTT client] message with topic: ${event[0].topic}");
-    print("[MQTT client] message with message: ${message}");
+  void updateList(String topic, String message) {
     setState(() {
       sensors.forEach((sensor) {
-        if(sensor.mqtt == event[0].topic) {
-            sensor.tempTemp = double.parse(message);
-            _controller.add(event[0].topic);
-            sharedPref.save(sensor.name, sensor);
+        if(sensor.mqtt == topic) {
+          sensor.tempTemp = double.parse(message);
+          _controller.add(topic);
+          sharedPref.save(sensor.name, sensor);
         }
       });
     });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("ScanTemp",
+          style: TextStyle(
+            color: Colors.white,
+          ),
+        ),
+        centerTitle: true,
+      ),
+      body: ListView.builder(
+        itemCount: sensors.length,
+        itemBuilder: (context, index) {
+            return Dismissible(
+                key: UniqueKey(),
+                child: sensors[index],
+                background: Container(color: Colors.red),
+                onDismissed: (direction) {
+                  addSensor tempSensor = sensors[index];
+                  setState(() {
+                    sensors.removeAt(index);
+                  });
+                  mqttClient.unsubscribeToTopic(tempSensor.mqtt);
+                  sharedPref.remove(tempSensor.name);
+                  sharedPref.findAndRemoveStringList("sensors", tempSensor.name);
+                },
+            );
+          },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () =>_navigateAndDisplayAdd(context),
+        tooltip: 'Add Sensor',
+        child: Icon(Icons.add, color: Colors.white,),
+      ),
+    );
   }
 }

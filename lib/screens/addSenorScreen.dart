@@ -16,8 +16,6 @@ class _addSensorScreenState extends State<addSensorScreen> {
   TextEditingController _controllerMin = TextEditingController();
   TextEditingController _controllerMax = TextEditingController();
 
-
-
   @override
   void dispose() {
     // Clean up the controller when the widget is disposed.
@@ -26,6 +24,29 @@ class _addSensorScreenState extends State<addSensorScreen> {
     _controllerMin.dispose();
     _controllerMax.dispose();
     super.dispose();
+  }
+
+  void _showDialog() {
+    // flutter defined function
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        // return object of type Dialog
+        return AlertDialog(
+          title: new Text("ERROR"),
+          content: new Text("Bitte alle Felder ausfüllen und bei den Temperaturen nur Zahlen eintragen!"),
+          actions: <Widget>[
+            // usually buttons at the bottom of the dialog
+            new FlatButton(
+              child: new Text("Close"),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -97,28 +118,6 @@ class _addSensorScreenState extends State<addSensorScreen> {
                     Navigator.pop(context, temp);
                   }
                   else {
-                    void _showDialog() {
-                      // flutter defined function
-                      showDialog(
-                        context: context,
-                        builder: (BuildContext context) {
-                          // return object of type Dialog
-                          return AlertDialog(
-                            title: new Text("ERROR"),
-                            content: new Text("Bitte alle Felder ausfüllen und bei den Temperaturen nur Zahlen eintragen!"),
-                            actions: <Widget>[
-                              // usually buttons at the bottom of the dialog
-                              new FlatButton(
-                                child: new Text("Close"),
-                                onPressed: () {
-                                  Navigator.of(context).pop();
-                                },
-                              ),
-                            ],
-                          );
-                        },
-                      );
-                    }
                     _showDialog();
                   }
                   },
